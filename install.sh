@@ -33,7 +33,7 @@ for arg in "$@"; do
         --claude)   DO_CLAUDE=true; DO_ALL=false ;;
         --cli-only) DO_CLI=true; DO_ALL=false ;;
         --all)      DO_ALL=true ;;
-        -h|--help)  sed -n '4,10p' "$0" | sed 's/^# //;s/^#$//'; exit 0 ;;
+        -h|--help)  sed -n '4,10p' "$_this_script" | sed 's/^# //;s/^#$//'; exit 0 ;;
         *) die "Unknown option: $arg" ;;
     esac
 done
@@ -41,7 +41,8 @@ $DO_ALL && { DO_CODEX=true; DO_CLAUDE=true; DO_CLI=true; }
 
 # ---- Resolve repo root ----
 
-_this_script="${BASH_SOURCE[0]:-$0}"
+_this_script="${BASH_SOURCE[0]:-}"
+[ -z "$_this_script" ] && _this_script="$0"
 if [ -f "$_this_script" ] && [ -d "$(dirname "$_this_script")/skills" ]; then
     REPO_ROOT="$(cd "$(dirname "$_this_script")" && pwd)"
 else
