@@ -27,7 +27,6 @@ DEFAULT_BASE="http://localhost:8080"
 
 DO_CODEX=false; DO_CLAUDE=false; DO_CLI=false; DO_ALL=true
 
-# Parse args (handle both "bash install.sh --xxx" and "curl ... | bash -s -- --xxx")
 for arg in "$@"; do
     case "$arg" in
         --codex)    DO_CODEX=true; DO_ALL=false ;;
@@ -42,8 +41,9 @@ $DO_ALL && { DO_CODEX=true; DO_CLAUDE=true; DO_CLI=true; }
 
 # ---- Resolve repo root ----
 
-if [ -f "${BASH_SOURCE[0]}" ] && [ -d "$(dirname "${BASH_SOURCE[0]}")/skills" ]; then
-    REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_this_script="${BASH_SOURCE[0]:-$0}"
+if [ -f "$_this_script" ] && [ -d "$(dirname "$_this_script")/skills" ]; then
+    REPO_ROOT="$(cd "$(dirname "$_this_script")" && pwd)"
 else
     REPO_ROOT="$(mktemp -d 2>/dev/null || mktemp -d -t onecrawler)"
     trap "rm -rf $REPO_ROOT" EXIT
@@ -69,11 +69,9 @@ if [ -t 0 ]; then
     echo -e "${CYAN}Where is your OneCrawler service running?${NC}"
     echo -e "  Press Enter for default: ${GREEN}$DEFAULT_BASE${NC}"
     echo ""
-    # Use /dev/tty for reliable interactive input (works with curl pipe too)
     read -r -p "  ONECRAWLER_BASE [$DEFAULT_BASE]: " user_base </dev/tty || true
     ONECRAWLER_BASE="${user_base:-$DEFAULT_BASE}"
 else
-    # Non-interactive (AI agent or piped input), use default
     ONECRAWLER_BASE="$DEFAULT_BASE"
     warn "Non-interactive mode — using default: $DEFAULT_BASE"
 fi
@@ -82,7 +80,7 @@ fi
 
 detect_shell_rc() {
     local shell_name
-    shell_name="$(basename "${SHELL:-$SHELL}")"
+    shell_name="$(basename "${SHELL:-/bin/bash}")"
     case "$shell_name" in
         zsh)  echo "$HOME/.zshrc" ;;
         bash) echo "$HOME/.bashrc" ;;
@@ -104,7 +102,6 @@ if $DO_CLI; then
         ok "CLI installed: $BIN_DIR/onecrawler"
     fi
 
-    # Ensure ~/.local/bin is in PATH
     if ! echo "$PATH" | tr ':' '\n' | grep -qF "$BIN_DIR"; then
         if ! grep -qF "export PATH=\"$BIN_DIR" "$SHELL_RC" 2>/dev/null; then
             echo "" >> "$SHELL_RC"
@@ -123,7 +120,6 @@ if ! grep -qF "export ONECRAWLER_BASE=" "$SHELL_RC" 2>/dev/null; then
     echo "export ONECRAWLER_BASE=\"$ONECRAWLER_BASE\"" >> "$SHELL_RC"
     ok "ONECRAWLER_BASE=$ONECRAWLER_BASE → $SHELL_RC"
 else
-    # Already configured — update if different
     current="$(grep 'export ONECRAWLER_BASE=' "$SHELL_RC" | tail -1 | sed 's/.*=//;s/"//g')"
     if [ "$current" != "$ONECRAWLER_BASE" ]; then
         warn "ONECRAWLER_BASE already set to $current in $SHELL_RC"
@@ -139,13 +135,11 @@ install_skills_to() {
     local dest="$1" label="$2"
     mkdir -p "$dest"
 
-    # Copy CLI alongside skills for fallback
     local cli_dest="$dest/cli/onecrawler"
     mkdir -p "$(dirname "$cli_dest")"
     cp "$CLI_SRC" "$cli_dest"
     chmod +x "$cli_dest"
 
-    # Sub-skills (directory-based)
     for dir in "$SKILLS_SRC"/*/; do
         local name; name=$(basename "$dir")
         local sf="$dir/SKILL.md"
@@ -159,7 +153,6 @@ install_skills_to() {
         ok "$label: onecrawler-$name"
     done
 
-    # Root skill (single-file)
     local root_skill="$SKILLS_SRC/onecrawler.md"
     if [ -f "$root_skill" ]; then
         if [ ! -f "$dest/onecrawler.md" ] || ! diff -q "$root_skill" "$dest/onecrawler.md" >/dev/null 2>&1; then
@@ -180,8 +173,6 @@ if $DO_CLAUDE; then
     echo "--- Claude Code (~/.claude/skills/) ---"
     install_skills_to "$CLAUDE_DIR" "claude"
 fi
-
-# ---- Summary ----
 
 echo ""
 echo -e "${GREEN}Done!${NC}"
