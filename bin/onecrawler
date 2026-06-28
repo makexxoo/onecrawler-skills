@@ -1,0 +1,296 @@
+#!/usr/bin/env bash
+# OneCrawler CLI — zero-dependency shell wrapper for the OneCrawler REST API.
+# Set ONECRAWLER_BASE to override default (http://localhost:8080).
+set -euo pipefail
+
+BASE_URL="${ONECRAWLER_BASE:-http://localhost:8080}"
+BASE_URL="${BASE_URL%/}"
+RESP_FILE="/tmp/onecrawler_resp_$$.json"
+trap 'rm -f "$RESP_FILE"' EXIT
+
+die() { echo "Error: $*" >&2; exit 1; }
+
+# ---- HTTP helpers ----
+
+_GET() {
+    local path="$1" code curl_exit
+    code=0
+    set +e
+    curl -s -o "$RESP_FILE" -w '%{http_code}' --connect-timeout 5 -m 30 "$BASE_URL$path" > "/tmp/onecrawler_code_$$.txt" 2>/dev/null
+    curl_exit=$?
+    set -e
+    if [ $curl_exit -ne 0 ]; then
+        die "Cannot reach $BASE_URL (curl exit $curl_exit). Is OneCrawler running?"
+    fi
+    code=$(cat "/tmp/onecrawler_code_$$.txt")
+    rm -f "/tmp/onecrawler_code_$$.txt"
+    if [ "$code" -ge 400 ] 2>/dev/null; then
+        cat "$RESP_FILE" >&2
+        echo "" >&2
+        die "HTTP $code"
+    fi
+    cat "$RESP_FILE"
+}
+
+_POST() {
+    local path="$1" body="$2" code curl_exit
+    code=0
+    set +e
+    curl -s -X POST -o "$RESP_FILE" -w '%{http_code}' --connect-timeout 5 -m 30 \
+        -H "Content-Type: application/json" -d "$body" "$BASE_URL$path" > "/tmp/onecrawler_code_$$.txt" 2>/dev/null
+    curl_exit=$?
+    set -e
+    if [ $curl_exit -ne 0 ]; then
+        die "Cannot reach $BASE_URL (curl exit $curl_exit). Is OneCrawler running?"
+    fi
+    code=$(cat "/tmp/onecrawler_code_$$.txt")
+    rm -f "/tmp/onecrawler_code_$$.txt"
+    if [ "$code" -ge 400 ] 2>/dev/null; then
+        cat "$RESP_FILE" >&2
+        echo "" >&2
+        die "HTTP $code"
+    fi
+    cat "$RESP_FILE"
+}
+
+_pretty()    { if command -v jq &>/dev/null; then jq . 2>/dev/null || cat; else cat; fi; }
+_json_val()  { grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$RESP_FILE" 2>/dev/null | head -1 | sed 's/.*: *"//;s/"$//' || echo "?"; }
+_json_num()  { grep -o "\"$1\"[[:space:]]*:[[:space:]]*[0-9]*" "$RESP_FILE" 2>/dev/null | head -1 | sed 's/.*: *//' || echo "0"; }
+
+# ---- health ----
+
+cmd_health() {
+    _GET "/api/health" | _pretty
+}
+
+# ---- task ----
+
+cmd_task_submit() {
+    local crawler_type="$1" platform="" keywords="" ids="" max_notes=20 max_comments=""
+    local enable_comments=true save_option="jsonl" body
+    shift
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --platform)     platform="$2"; shift 2 ;;
+            --keywords)     keywords="$2"; shift 2 ;;
+            --ids)          ids="$2"; shift 2 ;;
+            --max-notes)    max_notes="$2"; shift 2 ;;
+            --max-comments) max_comments="$2"; shift 2 ;;
+            --no-comments)  enable_comments=false; shift ;;
+            --save-option)  save_option="$2"; shift 2 ;;
+            *) die "Unknown option: $1" ;;
+        esac
+    done
+
+    [ -z "$platform" ] && die "--platform is required"
+
+    body="{\"platform\":\"$platform\",\"crawler_type\":\"$crawler_type\""
+    case "$crawler_type" in
+        search)
+            [ -z "$keywords" ] && die "--keywords is required for search"
+            body="$body,\"keywords\":\"$keywords\",\"max_notes_count\":$max_notes,\"enable_comments\":$enable_comments,\"save_option\":\"$save_option\""
+            ;;
+        detail)
+            [ -z "$ids" ] && die "--ids is required for detail"
+            body="$body,\"specified_ids\":\"$ids\",\"enable_comments\":$enable_comments"
+            [ -n "$max_comments" ] && body="$body,\"max_comments_count\":$max_comments"
+            ;;
+        creator)
+            [ -z "$ids" ] && die "--ids is required for creator"
+            body="$body,\"creator_ids\":\"$ids\",\"max_notes_count\":$max_notes,\"enable_comments\":$enable_comments,\"save_option\":\"$save_option\""
+            ;;
+    esac
+    body="$body}"
+
+    _POST "/api/task/submit" "$body" | _pretty
+}
+
+cmd_task_status() {
+    local task_id="$1" data status
+    data=$(_GET "/api/task/$task_id")
+    status=$(_json_val status)
+    echo "Status: $status"
+    if echo "$data" | grep -q '"progress"'; then
+        echo "  Notes fetched: $(_json_num total_notes_fetched)"
+        echo "  Current page:  $(_json_num current_page)"
+    fi
+    echo "$data" | _pretty
+}
+
+cmd_task_wait() {
+    local task_id="$1" max_polls="${2:-10}" interval="${3:-5}" i status data
+    for ((i=1; i<=max_polls; i++)); do
+        data=$(_GET "/api/task/$task_id")
+        status=$(_json_val status)
+        echo "[$i/$max_polls] $status"
+        if [ "$status" = "completed" ] || [ "$status" = "failed" ]; then
+            echo "$data" | _pretty
+            return
+        fi
+        sleep "$interval"
+    done
+    die "Timed out waiting for task to complete."
+}
+
+cmd_task_result() {
+    _GET "/api/task/$1/result" | _pretty
+}
+
+cmd_task_list() {
+    _GET "/api/task/list" | _pretty
+}
+
+# ---- account ----
+
+cmd_account_list() {
+    local platform="${1:-}"
+    local path="/api/accounts/list"
+    [ -n "$platform" ] && path="$path?platform=$platform"
+    _GET "$path" | _pretty
+}
+
+cmd_account_health() {
+    _GET "/api/accounts/$1/health" | _pretty
+}
+
+cmd_account_login() {
+    local platform="${1:-xhs}" no_wait="${2:-}" data session qr
+    echo "Requesting QR code..."
+    data=$(_POST "/api/accounts/login-browser" "{\"platform\":\"$platform\"}")
+    qr=$(echo "$data" | _json_val qrcode_base64)
+    [ -z "$qr" ] && qr=$(echo "$data" | _json_val qr_url)
+    session=$(echo "$data" | _json_val session_token)
+
+    if [ -n "$qr" ]; then
+        if echo "$qr" | grep -q '^http'; then
+            echo ""
+            echo "QR URL: $qr"
+        else
+            echo ""
+            echo "![QR Code](data:image/png;base64,$qr)"
+        fi
+    fi
+
+    [ -z "$session" ] && die "No session token returned."
+    [ "$no_wait" = "true" ] && { echo "Session token: $session"; return; }
+
+    echo ""
+    echo "Scan the QR code with your ${platform^^} app."
+    echo "Waiting for scan (timeout 300s)..."
+
+    set +e
+    data=$(curl -s -X POST -m 310 "$BASE_URL/api/accounts/login-browser/$session/wait" 2>/dev/null)
+    set -e
+    echo ""
+    echo "Login succeeded!"
+    echo "$data" | _pretty
+}
+
+# ---- data ----
+
+cmd_data_posts() {
+    local path="/api/data/posts?" params=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --platform)   params+=("platform=$2"); shift 2 ;;
+            --keyword)    params+=("keyword=$2"); shift 2 ;;
+            --date-from)  params+=("date_from=$2"); shift 2 ;;
+            --date-to)    params+=("date_to=$2"); shift 2 ;;
+            --sort)       params+=("sort=$2"); shift 2 ;;
+            --order)      params+=("order=$2"); shift 2 ;;
+            --page)       params+=("page=$2"); shift 2 ;;
+            --page-size)  params+=("page_size=$2"); shift 2 ;;
+            *) die "Unknown option: $1" ;;
+        esac
+    done
+    path="$path$(IFS='&'; echo "${params[*]}")"
+    _GET "$path" | _pretty
+}
+
+cmd_data_comments() {
+    local path="/api/data/comments?" params=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --platform)   params+=("platform=$2"); shift 2 ;;
+            --note-id)    params+=("note_id=$2"); shift 2 ;;
+            --keyword)    params+=("keyword=$2"); shift 2 ;;
+            --date-from)  params+=("date_from=$2"); shift 2 ;;
+            --date-to)    params+=("date_to=$2"); shift 2 ;;
+            --page)       params+=("page=$2"); shift 2 ;;
+            --page-size)  params+=("page_size=$2"); shift 2 ;;
+            *) die "Unknown option: $1" ;;
+        esac
+    done
+    path="$path$(IFS='&'; echo "${params[*]}")"
+    _GET "$path" | _pretty
+}
+
+# ---- usage ----
+
+usage() {
+    cat <<'EOF'
+onecrawler — OneCrawler CLI
+
+Usage:
+  onecrawler health
+  onecrawler task submit <search|detail|creator> --platform PLATFORM [options]
+  onecrawler task status <task_id>
+  onecrawler task wait <task_id> [max_polls] [interval_seconds]
+  onecrawler task result <task_id>
+  onecrawler task list
+  onecrawler account list [platform]
+  onecrawler account health <account_id>
+  onecrawler account login [platform] [no_wait]
+  onecrawler data posts [--platform PLATFORM] [--keyword KW] ...
+  onecrawler data comments [--platform PLATFORM] [--note-id ID] ...
+
+Task submit options:
+  --platform PLATFORM   Required: xhs|dy|ks|bili|wb|tieba|zhihu
+  --keywords KW         Comma-separated keywords (search)
+  --ids IDS             Post/creator IDs (detail/creator)
+  --max-notes N         Max notes to fetch (search/creator, default 20)
+  --max-comments N      Max comments (detail)
+  --no-comments         Disable comment fetching
+  --save-option FMT     jsonl (default) or json
+
+Set ONECRAWLER_BASE to override default http://localhost:8080.
+EOF
+}
+
+# ---- dispatch ----
+
+main() {
+    local cmd="${1:-}"
+    [ -z "$cmd" ] && { usage; exit 1; }
+
+    case "$cmd" in
+        -h|--help|help) usage ;;
+        health) cmd_health ;;
+        task)
+            case "${2:-}" in
+                submit)  shift 2; cmd_task_submit "$@" ;;
+                status)  cmd_task_status "${3:?task_id required}" ;;
+                wait)    cmd_task_wait "${3:?task_id required}" "${4:-10}" "${5:-5}" ;;
+                result)  cmd_task_result "${3:?task_id required}" ;;
+                list)    cmd_task_list ;;
+                *)       usage >&2; die "Unknown task command: ${2:-}" ;;
+            esac ;;
+        account)
+            case "${2:-}" in
+                list)    cmd_account_list "${3:-}" ;;
+                health)  cmd_account_health "${3:?account_id required}" ;;
+                login)   cmd_account_login "${3:-xhs}" "${4:-false}" ;;
+                *)       usage >&2; die "Unknown account command: ${2:-}" ;;
+            esac ;;
+        data)
+            case "${2:-}" in
+                posts)    shift 2; cmd_data_posts "$@" ;;
+                comments) shift 2; cmd_data_comments "$@" ;;
+                *)        usage >&2; die "Unknown data command: ${2:-}" ;;
+            esac ;;
+        *) usage >&2; die "Unknown command: $cmd" ;;
+    esac
+}
+
+main "$@"
