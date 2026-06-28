@@ -1,6 +1,6 @@
 # OneCrawler Skills
 
-AI agent skills for the [OneCrawler](https://github.com/NanmiCoder/MediaCrawler) REST API — crawl Chinese social media platforms (小红书、抖音、B站、微博、快手、知乎、贴吧) via natural language.
+AI agent skills for the OneCrawler REST API — crawl Chinese social media platforms (小红书、抖音、B站、微博、快手、知乎、贴吧) via natural language.
 
 ## Quick Install
 
