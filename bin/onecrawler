@@ -54,7 +54,7 @@ _POST() {
 }
 
 _pretty()    { if command -v jq &>/dev/null; then jq . 2>/dev/null || cat; else cat; fi; }
-_json_val()  { grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$RESP_FILE" 2>/dev/null | head -1 | sed 's/.*: *"//;s/"$//' || echo "?"; }
+_json_val()  { grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$RESP_FILE" 2>/dev/null | head -1 | sed 's/.*: *"//;s/"$//' || echo ""; }
 _json_num()  { grep -o "\"$1\"[[:space:]]*:[[:space:]]*[0-9]*" "$RESP_FILE" 2>/dev/null | head -1 | sed 's/.*: *//' || echo "0"; }
 
 # ---- health ----
@@ -155,12 +155,33 @@ cmd_account_health() {
 }
 
 cmd_account_login() {
-    local platform="${1:-xhs}" no_wait="${2:-}" data session qr
-    echo "Requesting QR code..."
-    data=$(_POST "/api/accounts/login-browser" "{\"platform\":\"$platform\"}")
+    local platform="${1:-xhs}" force=false data qr
+    # Parse flags
+    for arg in "$@"; do
+        case "$arg" in
+            --force) force=true ;;
+            xhs|dy|ks|bili|wb|tieba|zhihu) platform="$arg" ;;
+        esac
+    done
+
+    local url="/api/accounts/login-browser"
+    $force && url="$url?force=true"
+
+    echo "Requesting login..."
+    data=$(_POST "$url" "{\"platform\":\"$platform\"}")
+
+    # Check if browser was already logged in (no QR needed)
+    if echo "$data" | grep -q '"already_logged_in"[[:space:]]*:[[:space:]]*true'; then
+        echo ""
+        echo "Already logged in — cookies extracted from browser."
+        echo "Account ID: $(echo "$data" | _json_val account_id)"
+        echo ""
+        echo "$data" | _pretty
+        return
+    fi
+
     qr=$(echo "$data" | _json_val qrcode_base64)
     [ -z "$qr" ] && qr=$(echo "$data" | _json_val qr_url)
-    session=$(echo "$data" | _json_val session_token)
 
     if [ -n "$qr" ]; then
         if echo "$qr" | grep -q '^http'; then
@@ -172,19 +193,9 @@ cmd_account_login() {
         fi
     fi
 
-    [ -z "$session" ] && die "No session token returned."
-    [ "$no_wait" = "true" ] && { echo "Session token: $session"; return; }
-
     echo ""
-    echo "Scan the QR code with your ${platform^^} app."
-    echo "Waiting for scan (timeout 300s)..."
-
-    set +e
-    data=$(curl -s -X POST -m 310 "$BASE_URL/api/accounts/login-browser/$session/wait" 2>/dev/null)
-    set -e
-    echo ""
-    echo "Login succeeded!"
-    echo "$data" | _pretty
+    echo "Open the QR URL in your browser, scan with $(echo "$platform" | tr '[:lower:]' '[:upper:]') app."
+    echo "The server will detect login automatically and save the account."
 }
 
 # ---- data ----
@@ -241,7 +252,7 @@ Usage:
   onecrawler task list
   onecrawler account list [platform]
   onecrawler account health <account_id>
-  onecrawler account login [platform] [no_wait]
+  onecrawler account login [platform] [--force]
   onecrawler data posts [--platform PLATFORM] [--keyword KW] ...
   onecrawler data comments [--platform PLATFORM] [--note-id ID] ...
 
@@ -280,7 +291,7 @@ main() {
             case "${2:-}" in
                 list)    cmd_account_list "${3:-}" ;;
                 health)  cmd_account_health "${3:?account_id required}" ;;
-                login)   cmd_account_login "${3:-xhs}" "${4:-false}" ;;
+                login)   shift 2; cmd_account_login "$@" ;;
                 *)       usage >&2; die "Unknown account command: ${2:-}" ;;
             esac ;;
         data)

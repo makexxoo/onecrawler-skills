@@ -14,13 +14,15 @@ Key fields: `status` (pending|running|completed|failed|paused), `progress.total_
 Or wait until completion:
 
 ```bash
-onecrawler task wait <task_id> --max-polls 3 --interval 5
+onecrawler task wait <task_id> 3 5
 ```
+
+(max 3 polls, 5 seconds interval, defaults to 10 polls / 5s)
 
 If task stays `pending` too long, check accounts:
 
 ```bash
-onecrawler account list --platform xhs
+onecrawler account list xhs
 ```
 
-If total is 0, use `account-list` skill to trigger login.
+If no healthy accounts, use `account-list` skill to trigger login.

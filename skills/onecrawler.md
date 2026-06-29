@@ -67,8 +67,10 @@ Use `--no-comments` to skip comment fetching. Use `--save-option json` or `--sav
 onecrawler task status <task_id>
 
 # Or poll until completion:
-onecrawler task wait <task_id> --max-polls 5 --interval 5
+onecrawler task wait <task_id> 5 5
 ```
+
+(max 5 polls, 5 second intervals; defaults to 10 polls / 5s)
 
 ## Get Results
 
@@ -79,26 +81,25 @@ onecrawler task list
 
 ## Account Management
 
-QR code login (remote-friendly — user scans with phone app):
-
 ```bash
-onecrawler account login --platform xhs
-```
-
-This prints a QR code markdown image. Tell the user: "Scan this with your app."
-
-Skip wait:
-
-```bash
-onecrawler account login --platform xhs --no-wait
-```
-
-Other operations:
-
-```bash
-onecrawler account list
-onecrawler account list --platform xhs
+onecrawler account list xhs
 onecrawler account health <account_id>
+```
+
+**Login:** The server first tries to extract cookies from the browser.
+If already logged in, it outputs "Already logged in — cookies extracted from browser" — no scan needed.
+Otherwise it returns a QR code (base64 image or URL):
+
+```bash
+onecrawler account login xhs
+```
+
+Tell the user: open the URL, scan with the platform app, and the server will auto-detect login.
+
+Force re-login (skip browser cookie extraction):
+
+```bash
+onecrawler account login xhs --force
 ```
 
 ## Diagnostics
@@ -106,10 +107,10 @@ onecrawler account health <account_id>
 Before polling a pending task, check accounts first:
 
 ```bash
-onecrawler account list --platform xhs
+onecrawler account list xhs
 ```
 
-- "No accounts" → `onecrawler account login --platform xhs`
+- No healthy accounts → `onecrawler account login xhs`
 - Poll 2-3 times; if still pending, diagnose rather than polling more
 
 ## Query Data
