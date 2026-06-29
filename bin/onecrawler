@@ -160,6 +160,11 @@ cmd_account_health() {
     _GET "/api/accounts/$1/health" | _pretty
 }
 
+cmd_account_reset() {
+    echo "Resetting account ${1:?account_id required}..."
+    _POST "/api/accounts/$1/reset" "{}" | _pretty
+}
+
 cmd_account_login() {
     local platform="${1:-xhs}" force=false data qr
     # Parse flags
@@ -259,6 +264,7 @@ Usage:
   onecrawler task list
   onecrawler account list [platform]
   onecrawler account health <account_id>
+  onecrawler account reset <account_id>
   onecrawler account login [platform] [--force]
   onecrawler data posts [--platform PLATFORM] [--keyword KW] ...
   onecrawler data comments [--platform PLATFORM] [--note-id ID] ...
@@ -299,6 +305,7 @@ main() {
             case "${2:-}" in
                 list)    cmd_account_list "${3:-}" ;;
                 health)  cmd_account_health "${3:?account_id required}" ;;
+                reset)   cmd_account_reset "${3:?account_id required}" ;;
                 login)   shift 2; cmd_account_login "$@" ;;
                 *)       usage >&2; die "Unknown account command: ${2:-}" ;;
             esac ;;

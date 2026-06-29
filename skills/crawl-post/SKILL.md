@@ -11,4 +11,4 @@ onecrawler task submit creator --platform xhs --ids "creator_id" --max-notes 20
 
 Platform: xhs|dy|ks|bili|wb|tieba|zhihu.
 
-Returns `Task submitted: <task_id>`. Use `task-status` skill to poll.
+Returns `Task submitted: <task_id>`. Use `onecrawler-task-status` skill to check progress.

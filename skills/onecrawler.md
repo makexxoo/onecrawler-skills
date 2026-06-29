@@ -57,7 +57,7 @@ onecrawler task submit search --platform xhs --keywords "KEYWORD1,KEYWORD2" --ma
 onecrawler task submit detail --platform xhs --ids "POST_ID_OR_URL" --max-comments 50
 onecrawler task submit creator --platform xhs --ids "creator_id" --max-notes 20
 ```
-Returns: `Task submitted: <task_id>`
+Returns: `Task submitted: <task_id>`. After submitting, tell the user to check progress with `onecrawler-task-status`.
 
 Use `--no-comments` to skip comment fetching. Use `--save-option json` or `--save-option jsonl`.
 
@@ -65,12 +65,9 @@ Use `--no-comments` to skip comment fetching. Use `--save-option json` or `--sav
 
 ```bash
 onecrawler task status <task_id>
-
-# Or poll until completion:
-onecrawler task wait <task_id> 5 5
 ```
 
-(max 5 polls, 5 second intervals; defaults to 10 polls / 5s)
+Key fields: `status` (pending|running|completed|failed|paused), `progress.total_notes_fetched`, `progress.current_page`.
 
 ## Get Results
 
@@ -104,14 +101,13 @@ onecrawler account login xhs --force
 
 ## Diagnostics
 
-Before polling a pending task, check accounts first:
+If a task stays `pending` too long, check accounts:
 
 ```bash
 onecrawler account list xhs
 ```
 
-- No healthy accounts → `onecrawler account login xhs`
-- Poll 2-3 times; if still pending, diagnose rather than polling more
+- No healthy accounts → use `onecrawler-account-login` skill.
 
 ## Query Data
 

@@ -11,4 +11,4 @@ onecrawler task submit detail --platform xhs --ids "POST_ID_OR_URL" --max-commen
 
 `--ids` accepts raw IDs, full URLs, or comma-separated list.
 
-Returns `Task submitted: <task_id>`.
+Returns `Task submitted: <task_id>`. Use `onecrawler-task-status` skill to check progress.
