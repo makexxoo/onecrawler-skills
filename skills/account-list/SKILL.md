@@ -1,6 +1,6 @@
 ---
 name: onecrawler-account-list
-description: Manage OneCrawler platform accounts — list, check health, and trigger browser login.
+description: Manage OneCrawler platform accounts — list and check health.
 ---
 
 ## List
@@ -9,23 +9,10 @@ description: Manage OneCrawler platform accounts — list, check health, and tri
 onecrawler account list xhs
 ```
 
-If output shows no healthy accounts, trigger login:
-
-```bash
-onecrawler account login xhs
-```
-
-The server first tries to extract cookies from the browser. If the browser is already logged in, it outputs "Already logged in" — no scan needed.
-Otherwise it returns a QR code (base64 image or a URL). Tell the user to open the URL, scan with the platform app, and the server will detect login automatically.
+If output shows no healthy accounts, use `onecrawler-account-login` skill to trigger login.
 
 ## Health
 
 ```bash
 onecrawler account health <account_id>
-```
-
-## Login (force re-login)
-
-```bash
-onecrawler account login xhs --force
 ```

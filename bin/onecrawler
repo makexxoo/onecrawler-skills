@@ -124,13 +124,19 @@ cmd_task_wait() {
         data=$(_GET "/api/task/$task_id")
         status=$(_json_val status)
         echo "[$i/$max_polls] $status"
-        if [ "$status" = "completed" ] || [ "$status" = "failed" ]; then
+        if [ "$status" = "completed" ] || [ "$status" = "failed" ] || [ "$status" = "stopped" ]; then
             echo "$data" | _pretty
             return
         fi
         sleep "$interval"
     done
     die "Timed out waiting for task to complete."
+}
+
+cmd_task_stop() {
+    local task_id="${1:?task_id required}"
+    echo "Stopping task $task_id..."
+    _POST "/api/task/$task_id/stop" "{}" | _pretty
 }
 
 cmd_task_result() {
@@ -249,6 +255,7 @@ Usage:
   onecrawler task status <task_id>
   onecrawler task wait <task_id> [max_polls] [interval_seconds]
   onecrawler task result <task_id>
+  onecrawler task stop <task_id>
   onecrawler task list
   onecrawler account list [platform]
   onecrawler account health <account_id>
@@ -284,6 +291,7 @@ main() {
                 status)  cmd_task_status "${3:?task_id required}" ;;
                 wait)    cmd_task_wait "${3:?task_id required}" "${4:-10}" "${5:-5}" ;;
                 result)  cmd_task_result "${3:?task_id required}" ;;
+                stop)    cmd_task_stop "${3:?task_id required}" ;;
                 list)    cmd_task_list ;;
                 *)       usage >&2; die "Unknown task command: ${2:-}" ;;
             esac ;;

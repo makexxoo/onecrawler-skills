@@ -17,7 +17,7 @@ Or wait until completion:
 onecrawler task wait <task_id> 3 5
 ```
 
-(max 3 polls, 5 seconds interval, defaults to 10 polls / 5s)
+(max 3 polls, 5 seconds interval; defaults to 10 polls / 5s)
 
 If task stays `pending` too long, check accounts:
 
@@ -25,4 +25,4 @@ If task stays `pending` too long, check accounts:
 onecrawler account list xhs
 ```
 
-If no healthy accounts, use `account-list` skill to trigger login.
+If no healthy accounts, use `onecrawler-account-login` skill to trigger login.
