@@ -111,9 +111,17 @@ onecrawler account list xhs
 
 ## Query Data
 
+Export crawled data from completed tasks. Never pipe raw data to the model.
+
 ```bash
-onecrawler data posts --platform xhs --keyword "美食" --page 1 --page-size 20
-onecrawler data comments --platform xhs --note-id "abc123" --page 1 --page-size 20
+# Posts (Excel)
+onecrawler data export <task_id> posts xlsx
+
+# Comments (Excel)
+onecrawler data export <task_id> comments xlsx
+
+# Also supports fmt=csv and fmt=json
 ```
 
-Add `--json` for raw output.
+Output defaults to `$HOME/Downloads/`, falls back to `$PWD`. Override with `ONECRAWLER_OUTDIR`.
+Tell the user the file path.

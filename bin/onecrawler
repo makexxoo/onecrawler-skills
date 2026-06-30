@@ -248,6 +248,36 @@ cmd_data_comments() {
     _GET "$path" | _pretty
 }
 
+
+# ---- data export ----
+
+cmd_data_export() {
+    local task_id="$1" type="${2:-posts}" fmt="${3:-xlsx}" outfile url ext outdir
+
+    case "$fmt" in
+        excel|xlsx) ext="xlsx" ;;
+        csv)        ext="csv" ;;
+        json|*)     ext="json" ;;
+    esac
+
+    # Resolve output directory: $ONECRAWLER_OUTDIR > $HOME/Downloads > $PWD
+    if [ -n "${ONECRAWLER_OUTDIR:-}" ]; then
+        outdir="$ONECRAWLER_OUTDIR"
+    elif [ -d "$HOME/Downloads" ]; then
+        outdir="$HOME/Downloads"
+    else
+        outdir="$PWD"
+    fi
+
+    outfile="${outdir}/onecrawler_${type}_${task_id}.${ext}"
+
+    url="/api/data/task/${task_id}/export?type=${type}&fmt=${fmt}"
+
+    echo "Exporting ${type} (fmt=${fmt}) for task ${task_id}..."
+    curl -s -o "$outfile" --connect-timeout 5 -m 60 "$BASE_URL$url"
+    echo "Written: $outfile"
+}
+
 # ---- usage ----
 
 usage() {
@@ -268,6 +298,7 @@ Usage:
   onecrawler account login [platform] [--force]
   onecrawler data posts [--platform PLATFORM] [--keyword KW] ...
   onecrawler data comments [--platform PLATFORM] [--note-id ID] ...
+  onecrawler data export <task_id> <posts|comments> [xlsx|csv|json]
 
 Task submit options:
   --platform PLATFORM   Required: xhs|dy|ks|bili|wb|tieba|zhihu
@@ -313,6 +344,7 @@ main() {
             case "${2:-}" in
                 posts)    shift 2; cmd_data_posts "$@" ;;
                 comments) shift 2; cmd_data_comments "$@" ;;
+                export)   cmd_data_export "${3:?task_id required}" "${4:-posts}" "${5:-xlsx}" ;;
                 *)        usage >&2; die "Unknown data command: ${2:-}" ;;
             esac ;;
         *) usage >&2; die "Unknown command: $cmd" ;;
