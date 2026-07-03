@@ -81,6 +81,7 @@ onecrawler task list
 ```bash
 onecrawler account list xhs
 onecrawler account health <account_id>
+onecrawler account delete <account_id>
 ```
 
 **Login:** The server first tries to extract cookies from the browser.
@@ -97,7 +98,9 @@ Force re-login (skip browser cookie extraction):
 
 ```bash
 onecrawler account login xhs --force
-```
+
+**Delete:** Removes the account permanently. Get the account ID from `account list` first.
+Always ask for user confirmation before deleting.
 
 ## Diagnostics
 

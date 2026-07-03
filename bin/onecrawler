@@ -67,7 +67,7 @@ cmd_health() {
 
 cmd_task_submit() {
     local crawler_type="$1" platform="" keywords="" ids="" max_notes=20 max_comments=""
-    local enable_comments=true save_option="jsonl" body
+    local enable_comments=true save_option="" body
     shift
 
     while [ $# -gt 0 ]; do
@@ -165,6 +165,12 @@ cmd_account_reset() {
     _POST "/api/accounts/$1/reset" "{}" | _pretty
 }
 
+
+cmd_account_delete() {
+    local account_id="${1:?account_id required}"
+    echo "Deleting account $account_id..."
+    curl -s -X DELETE "$BASE_URL/api/accounts/$account_id" | _pretty
+}
 cmd_account_login() {
     local platform="${1:-xhs}" force=false data qr
     # Parse flags
@@ -295,6 +301,7 @@ Usage:
   onecrawler account list [platform]
   onecrawler account health <account_id>
   onecrawler account reset <account_id>
+  onecrawler account delete <account_id>
   onecrawler account login [platform] [--force]
   onecrawler data posts [--platform PLATFORM] [--keyword KW] ...
   onecrawler data comments [--platform PLATFORM] [--note-id ID] ...
@@ -337,6 +344,7 @@ main() {
                 list)    cmd_account_list "${3:-}" ;;
                 health)  cmd_account_health "${3:?account_id required}" ;;
                 reset)   cmd_account_reset "${3:?account_id required}" ;;
+                delete)  cmd_account_delete "${3:?account_id required}" ;;
                 login)   shift 2; cmd_account_login "$@" ;;
                 *)       usage >&2; die "Unknown account command: ${2:-}" ;;
             esac ;;
